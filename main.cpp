@@ -37,7 +37,31 @@ bool CheckAddress(LPVOID address, LPVOID base, SIZE_T size)
 
 
 
+template <class T>
+inline std::string ToHex(T v, size_t hex_len = sizeof(T) << 1)
+{
 
+	static const char* digits = "0123456789ABCDEF";
+	std::string res(hex_len + 2, '0');
+	const char* str_pref = "0x";
+	memcpy((void*)res.c_str(), str_pref, 2);
+
+	for (size_t i = 2, j = (hex_len - 1) * 4; i < hex_len + 2; i++, j -= 4)
+		res[i] = digits[(v >> j) & 0x0f];
+
+	return res;
+
+}
+
+
+//courtesy 2 dude on stackoverflow
+inline std::wstring ToWstring(std::string s)
+{
+	size_t len = s.size();
+	std::wstring ws(len, ' ');
+	MultiByteToWideChar(CP_UTF8, MB_PRECOMPOSED, s.c_str(), len, (LPWSTR)ws.c_str(), len);
+	return ws;
+}
 
 //using NameModuleMap = std::unordered_map<std::string, HMODULE>;
 using vector_MemInfo = std::vector<MEMORY_BASIC_INFORMATION>;
@@ -77,12 +101,20 @@ std::vector<ModuleInfo> GetModules(HANDLE hProc)
 std::wstring path;
 
 
-bool WriteBuffer(LPCVOID buffer, size_t size, std::wstring fname_app)
+bool DumpBuffer(HANDLE hProc, LPVOID address, size_t size)
 {
+
+
 	std::wstring fname = path;
 	fname.append(L"\\");
-	fname.append(fname_app);
+	fname.append(ToWstring(ToHex((SIZE_T)address)) + L".bin");
+	char* buf = new char[size];
 
+	SIZE_T st;
+	ReadProcessMemory(hProc, address, buf, size, &st);
+
+
+	
 
 
 	HANDLE hFile = CreateFileW(fname.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -90,10 +122,12 @@ bool WriteBuffer(LPCVOID buffer, size_t size, std::wstring fname_app)
 	DWORD bytesWritten;
 
 	//write dumped memory to file
-	if (!WriteFile(hFile, buffer, size, &bytesWritten, nullptr))
+	if (!WriteFile(hFile, buf, size, &bytesWritten, nullptr))
 		return false;
 
 	CloseHandle(hFile);
+	//boo hoo leaky memory
+	delete[] buf;
 	return true;
 
 }
@@ -102,7 +136,7 @@ bool WriteBuffer(LPCVOID buffer, size_t size, std::wstring fname_app)
 int main()
 {
 	path = std::wstring(L"./") + std::to_wstring(static_cast<long>(time(0)));
-	HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, 54640);
+	HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, 49500);
 	filesystem::create_directories(path);
 	int a;
 	std::vector<ModuleInfo> mods = GetModules(hProc);
@@ -182,6 +216,8 @@ int main()
 			std::cout << "Found region not associated with a module!\n";
 			std::cout << "Address: 0x" << std::hex << v.BaseAddress << "\n\n";
 			std::cout << "Size: " << std::dec << v.RegionSize << " / 0x" << std::hex << v.RegionSize << "\n\n\n";
+			DumpBuffer(hProc, v.BaseAddress, v.RegionSize);
+
 		}
 	}
 	std::cout << "Press enter to terminate...";
