@@ -26,6 +26,17 @@ struct ModuleInfo
 
 
 
+bool CheckAddress(LPVOID address, LPVOID base, SIZE_T size)
+{
+	// no comment :/
+	if ((address >= base) && (address < (LPVOID)((size_t)base + size)))
+		return true;
+	return false;
+	
+}
+
+
+
 
 
 //using NameModuleMap = std::unordered_map<std::string, HMODULE>;
@@ -124,11 +135,25 @@ int main()
 
 	//This only searches for regions that does not belong to any page for now
 	//However there are 2 cases that are not accounted (for now):
-	//a. manual mapped module is located right after a known module, with same protection
 	//b. manual mapped module is BETWEEN two known modules, with same protection
-	//first case can be easily detected by comparing the sizes of region/module.
 	//second case needs more work tho(also unlikely to happen unless deliberately made to be like that)
 	//oh yea u can also hide ur pages from the thingy iirc but im not gonna do anything remotely related to that...
+
+	//Deleted the first case cuz i think u actually need 2 scan for page ranges anyway
+	//now i have to do ranges stuff now...
+	//THE USACO NIGHTMARES ARE BACK AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+
+	//okok tree data stucture kind of
+	//except the nodes are ranges now so i ned 2 write custom class 
+	//ugh
+
+	//actually no im just gonna bruteforce the range
+	//its like 4am now im not dealing wiith this shit
+
+
+
+
 
 	
 	for (auto& v : memRegionsExecute)
@@ -137,18 +162,16 @@ int main()
 		bool found = false;
 		for (auto& modinfo : mods)
 		{
-			if (modinfo.modInfo.lpBaseOfDll == v.BaseAddress)
+			if (CheckAddress(v.BaseAddress, modinfo.modInfo.lpBaseOfDll, modinfo.modInfo.SizeOfImage))
 			{
-				std::cout << "Found matching alloc base\n";
+				found = true;
+				//std::cout << "Found matching alloc base\n";
 				break;
 			}
 
 			
 		};
-		if ((size_t)v.BaseAddress == 0x4f080000)
-		{
-			std::cout << "i love cock\n";
-		}
+
 		if (found)
 		{
 			continue;
